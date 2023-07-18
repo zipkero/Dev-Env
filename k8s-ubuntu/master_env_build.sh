@@ -53,7 +53,7 @@ sudo apt-mark hold kubelet kubeadm kubectl
 OUTPUT_FILE=/vagrant/join.sh
 rm -rf $OUTPUT_FILE
 rm -rf /vagrant/.kube
-sudo kubeadm init --pod-network-cidr=172.16.0.0/16 --control-plane-endpoint=192.168.56.10 --apiserver-advertise-address=192.168.56.10
+sudo kubeadm init --pod-network-cidr=10.244.0.0/16 --control-plane-endpoint=192.168.56.10 --apiserver-advertise-address=192.168.56.10
 sudo kubeadm token create --print-join-command > $OUTPUT_FILE
 chmod +x $OUTPUT_FILE
 
