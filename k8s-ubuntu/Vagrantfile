@@ -1,37 +1,130 @@
-N = 2
-
 Vagrant.configure("2") do |config|
   config.vm.boot_timeout = 3000
 
   config.vm.define "master" do |master|
-    master.vm.box = "jharoian3/ubuntu-22.04-arm64"
-    master.vm.box_version = "0.3"
-    master.vm.network "private_network", ip: "192.168.56.10"
-    #master.vm.network "forwarded_port", guest: 22, host: 60010, auto_correct: true, id: "ssh"
     master.vm.hostname = "master"
+    master.vm.box = "ubuntu/jammy64"
 
-    master.vm.provider "parallels" do |v|
+    master.ssh.insert_key = false
+
+    master.vm.network "private_network", ip: "192.168.56.10"
+    master.vm.provider "virtualbox" do |v|
       v.memory = 2048
       v.cpus = 2
     end
-    
-    master.vm.provision "shell", path: "master_env_build.sh", args: N
+
+    master.vm.provision "0", type: "shell", preserve_order: true, privileged: true, inline: <<-EOC
+cat <<-'EOF' >/etc/modules-load.d/kubernetes.conf
+br_netfilter
+EOF
+
+sudo modprobe br_netfilter
+
+cat <<-'EOF' >/etc/sysctl.d/kubernetes.conf
+net.bridge.bridge-nf-call-iptables = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+net.ipv4.ip_forward = 1
+EOF
+
+sudo sysctl --system
+
+sudo apt update
+sudo apt install -y curl gnupg2 software-properties-common apt-transport-https ca-certificates
+
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmour -o /etc/apt/trusted.gpg.d/docker.gpg
+sudo add-apt-repository -y "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+
+sudo apt update
+sudo apt install -y containerd.io
+
+containerd config default | sudo tee /etc/containerd/config.toml >/dev/null 2>&1
+sudo sed -i 's/SystemdCgroup \= false/SystemdCgroup \= true/g' /etc/containerd/config.toml
+
+sudo systemctl restart containerd
+sudo systemctl enable containerd
+
+cat <<-'EOF' >/etc/default/kubelet
+KUBELET_EXTRA_ARGS=--node-ip=192.168.56.10
+EOF
+
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.29/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.29/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+sudo apt-get update
+sudo apt-get install -y kubelet kubeadm kubectl
+sudo apt-mark hold kubelet kubeadm kubectl
+ 
+OUTPUT_FILE=/vagrant/join.sh
+rm -rf $OUTPUT_FILE
+rm -rf /vagrant/.kube
+sudo kubeadm init --pod-network-cidr=10.244.0.0/16 --control-plane-endpoint=192.168.56.10 --apiserver-advertise-address=192.168.56.10
+sudo kubeadm token create --print-join-command > $OUTPUT_FILE
+chmod +x $OUTPUT_FILE
+
+mkdir -p $HOME/.kube
+sudo cp /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+cp -R $HOME/.kube /vagrant/.kube
+cp -R $HOME/.kube /home/vagrant/.kube
+sudo chown -R vagrant:vagrant /home/vagrant/.kube
+kubectl apply -f https://raw.githubusercontent.com/flannel-io/flannel/master/Documentation/kube-flannel.yml
+kubectl completion bash >/etc/bash_completion.d/kubectl
+echo 'alias k=kubectl' >>/home/vagrant/.bashrc
+    EOC
   end
 
-  (1..N).each do |i|
+  (1..2).each do |i|
     config.vm.define "worker#{i}" do |worker|
-      worker.vm.box = "jharoian3/ubuntu-22.04-arm64"
-      worker.vm.box_version = "0.3"
-      worker.vm.network "private_network", ip: "192.168.56.1#{i}"
-      #worker.vm.network "forwarded_port", guest: 22, host: "6001#{i}", auto_correct: true, id: "ssh"
       worker.vm.hostname = "worker#{i}"
+      worker.vm.box = "ubuntu/jammy64"
+      worker.vm.network "private_network", ip: "192.168.56.1#{i}"      
 
-      worker.vm.provider "parallels" do |v|
+      worker.ssh.insert_key = false
+
+      worker.vm.provider "virtualbox" do |v|
         v.memory = 1024
         v.cpus = 1
       end
 
-      worker.vm.provision "shell", path: "worker_env_build.sh", args: N
+      worker.vm.provision "0", type: "shell", preserve_order: true, privileged: true, inline: <<-EOC
+cat <<-'EOF' >/etc/modules-load.d/kubernetes.conf
+br_netfilter
+EOF
+
+sudo modprobe br_netfilter
+
+cat <<-'EOF' >/etc/sysctl.d/kubernetes.conf
+net.bridge.bridge-nf-call-iptables = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+net.ipv4.ip_forward = 1
+EOF
+
+sudo sysctl --system
+
+sudo apt update
+sudo apt install -y curl gnupg2 software-properties-common apt-transport-https ca-certificates
+
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmour -o /etc/apt/trusted.gpg.d/docker.gpg
+sudo add-apt-repository -y "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+
+sudo apt update
+sudo apt install -y containerd.io
+
+containerd config default | sudo tee /etc/containerd/config.toml >/dev/null 2>&1
+sudo sed -i 's/SystemdCgroup \= false/SystemdCgroup \= true/g' /etc/containerd/config.toml
+
+sudo systemctl restart containerd
+sudo systemctl enable containerd
+
+cat <<-'EOF' >/etc/default/kubelet
+KUBELET_EXTRA_ARGS=--node-ip=192.168.56.1#{i}
+EOF
+
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.28/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.28/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+sudo apt-get update
+sudo apt-get install -y kubelet kubeadm kubectl
+sudo apt-mark hold kubelet kubeadm kubectl
+      EOC
     end
   end
 end
