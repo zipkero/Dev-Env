@@ -1,14 +1,18 @@
 Vagrant.configure("2") do |config|    
-    config.vm.define "master" do |master|
-      master.vm.hostname = "master"
-      master.vm.box = "ubuntu/jammy64"
+    config.vbguest.auto_update = true  
+    
+    config.ssh.insert_key = false
 
-      master.ssh.insert_key = false
+    config.vm.define "master" do |master|
+      master.vm.box_check_update = true
+      master.vm.hostname = "master"
+      master.vm.box = "ubuntu/jammy64"      
 
       master.vm.network "private_network", ip: "192.168.50.10"
       master.vm.network "forwarded_port", guest: 22, host: 2200, id: "ssh"
       master.vm.provision "shell", inline: "ufw allow 22/tcp"      
-      master.vm.provider "virtualbox" do |v|
+
+      master.vm.provider "virtualbox" do |v|        
         v.memory = 2048
         v.cpus = 2
       end      
@@ -16,14 +20,14 @@ Vagrant.configure("2") do |config|
       
     (1..2).each do |i|
       config.vm.define "worker#{i}" do |worker|
+        worker.vm.box_check_update = true
         worker.vm.hostname = "worker#{i}"
-        worker.vm.box = "ubuntu/jammy64"
-
-        worker.ssh.insert_key = false
+        worker.vm.box = "ubuntu/jammy64"        
 
         worker.vm.network "private_network", ip: "192.168.50.#{10 + i}"
         worker.vm.network "forwarded_port", guest: 22, host: 2200 + i, id: "ssh"
         worker.vm.provision "shell", inline: "ufw allow 22/tcp"
+        
         worker.vm.provider "virtualbox" do |v|
           v.memory = 1024
           v.cpus = 1

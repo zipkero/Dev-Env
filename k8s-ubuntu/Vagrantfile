@@ -10,7 +10,7 @@ Vagrant.configure("2") do |config|
     master.vm.hostname = "master"
 
     master.vm.provider "virtualbox" do |v|
-      v.memory = 2048
+      v.memory = 4096
       v.cpus = 2
     end
 
@@ -81,7 +81,7 @@ echo 'alias k=kubectl' >>/home/vagrant/.bashrc
       worker.vm.hostname = "worker#{i}"
 
       worker.vm.provider "virtualbox" do |v|
-        v.memory = 1024
+        v.memory = 2048
         v.cpus = 1
       end
 
