@@ -1,23 +1,4 @@
-Vagrant.configure("2") do |config|    
-  config.vbguest.auto_update = true  
-  
-  config.ssh.insert_key = false
-
-  config.vm.define "master" do |master|
-    master.vm.box_check_update = true
-    master.vm.hostname = "master"
-    master.vm.box = "ubuntu/jammy64"      
-
-    master.vm.network "private_network", ip: "192.168.56.10"
-    master.vm.network "forwarded_port", guest: 22, host: 2200, id: "ssh"
-    master.vm.provision "shell", inline: "ufw allow 22/tcp"      
-
-    master.vm.provider "virtualbox" do |v|        
-      v.memory = 4096
-      v.cpus = 4
-    end      
-
-    master.vm.provision "0", type: "shell", preserve_order: true, privileged: true, inline: <<-EOC
+# 마스터
 swapoff -a
 sed -i '/swap/ s/^/#/' /etc/fstab
 
@@ -35,10 +16,10 @@ net.bridge.bridge-nf-call-ip6tables = 1
 net.ipv4.ip_forward = 1
 EOF
 
-echo "192.168.56.10 master" | sudo tee -a /etc/hosts
-for (( i=1; i<=2; i++ )); do 
-  echo "192.168.56.1$i worker$i" | sudo tee -a /etc/hosts
-done
+#echo "192.168.56.10 master" | sudo tee -a /etc/hosts
+#for (( i=1; i<=2; i++ )); do 
+#  echo "192.168.56.1$i worker$i" | sudo tee -a /etc/hosts
+#done
 
 sudo sysctl --system
 
@@ -57,9 +38,9 @@ sudo sed -i 's/SystemdCgroup \= false/SystemdCgroup \= true/g' /etc/containerd/c
 sudo systemctl restart containerd
 sudo systemctl enable containerd
 
-cat <<-'EOF' | sudo tee /etc/default/kubelet
-KUBELET_EXTRA_ARGS=--node-ip=192.168.56.10
-EOF
+#cat <<-'EOF' | sudo tee /etc/default/kubelet
+#KUBELET_EXTRA_ARGS=--node-ip=192.168.56.10
+#EOF
 
 sudo apt-get update
 sudo apt-get install -y apt-transport-https ca-certificates curl
@@ -69,41 +50,16 @@ sudo apt-get update
 sudo apt-get install -y kubelet kubeadm kubectl
 sudo apt-mark hold kubelet kubeadm kubectl
 
-OUTPUT_FILE=/vagrant/join.sh
-rm -rf $OUTPUT_FILE
-rm -rf /vagrant/.kube
-sudo kubeadm init --pod-network-cidr=10.244.0.0/16 --control-plane-endpoint=192.168.56.10 --apiserver-advertise-address=192.168.56.10
-sudo kubeadm token create --print-join-command > $OUTPUT_FILE
-chmod +x $OUTPUT_FILE
+sudo kubeadm init --pod-network-cidr=172.18.0.0/16
 
 mkdir -p $HOME/.kube
 sudo cp /etc/kubernetes/admin.conf $HOME/.kube/config
 sudo chown $(id -u):$(id -g) $HOME/.kube/config
-cp -R $HOME/.kube /vagrant/.kube
-cp -R $HOME/.kube /home/vagrant/.kube
-sudo chown -R vagrant:vagrant /home/vagrant/.kube
 kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.26.1/manifests/calico.yaml
 kubectl completion bash >/etc/bash_completion.d/kubectl
-echo 'alias k=kubectl' >>/home/vagrant/.bashrc
-    EOC
-  end
-    
-  (1..2).each do |i|
-    config.vm.define "worker#{i}" do |worker|
-      worker.vm.box_check_update = true
-      worker.vm.hostname = "worker#{i}"
-      worker.vm.box = "ubuntu/jammy64"        
+echo 'alias k=kubectl' | sudo tee -a $HOME/.bashrc
 
-      worker.vm.network "private_network", ip: "192.168.56.#{10 + i}"
-      worker.vm.network "forwarded_port", guest: 22, host: 2200 + i, id: "ssh"
-      worker.vm.provision "shell", inline: "ufw allow 22/tcp"
-
-      worker.vm.provider "virtualbox" do |v|
-        v.memory = 2048
-        v.cpus = 2
-      end      
-      
-      worker.vm.provision "0", type: "shell", preserve_order: true, privileged: true, inline: <<-EOC
+# 워커노드
 swapoff -a
 sed -i '/swap/ s/^/#/' /etc/fstab
 
@@ -121,12 +77,12 @@ net.bridge.bridge-nf-call-ip6tables = 1
 net.ipv4.ip_forward = 1
 EOF
 
-echo "192.168.56.10 master" | sudo tee -a /etc/hosts
-for (( i=1; i<=$1; i++ )); do
-  echo "192.168.56.1$i worker$i" | sudo tee -a /etc/hosts
-done
+#echo "192.168.56.10 master" | sudo tee -a /etc/hosts
+#for (( i=1; i<=$1; i++ )); do
+#  echo "192.168.56.1$i worker$i" | sudo tee -a /etc/hosts
+#done
 
-echo "KUBELET_EXTRA_ARGS=--node-ip=192.168.56.#{10 + i}" | sudo tee /etc/default/kubelet
+#echo "KUBELET_EXTRA_ARGS=--node-ip=192.168.56.#{10 + i}" | sudo tee /etc/default/kubelet
 
 sudo sysctl --system
 
@@ -152,7 +108,3 @@ curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.29/deb/Release.key | sudo gpg --
 sudo apt-get update
 sudo apt-get install -y kubelet kubeadm kubectl
 sudo apt-mark hold kubelet kubeadm kubectl
-      EOC
-    end
-  end  
-end
