@@ -1,3 +1,8 @@
+# multipass launch --name master --cpus 2 --memory 4G --disk 20G
+# multipass launch --name worker1 --cpus 2 --memory 2G --disk 20G
+# multipass launch --name worker2 --cpus 2 --memory 2G --disk 20G
+
+
 # 마스터
 swapoff -a
 sed -i '/swap/ s/^/#/' /etc/fstab
