@@ -5,7 +5,7 @@
 
 # 마스터
 swapoff -a
-sed -i '/swap/ s/^/#/' /etc/fstab
+sudo sed -i '/swap/ s/^/#/' /etc/fstab
 
 cat <<-'EOF' | sudo tee /etc/modules-load.d/kubernetes.conf
 overlay
@@ -47,15 +47,13 @@ sudo systemctl enable containerd
 #KUBELET_EXTRA_ARGS=--node-ip=192.168.56.10
 #EOF
 
-sudo apt-get update
-sudo apt-get install -y apt-transport-https ca-certificates curl
 echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.29/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
 curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.29/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
 sudo apt-get update
 sudo apt-get install -y kubelet kubeadm kubectl
 sudo apt-mark hold kubelet kubeadm kubectl
 
-sudo kubeadm init --pod-network-cidr=172.18.0.0/16
+sudo kubeadm init --pod-network-cidr=192.168.0.0/16
 
 mkdir -p $HOME/.kube
 sudo cp /etc/kubernetes/admin.conf $HOME/.kube/config
@@ -64,9 +62,11 @@ kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.26.1
 kubectl completion bash >/etc/bash_completion.d/kubectl
 echo 'alias k=kubectl' | sudo tee -a $HOME/.bashrc
 
+
+
 # 워커노드
 swapoff -a
-sed -i '/swap/ s/^/#/' /etc/fstab
+sudo sed -i '/swap/ s/^/#/' /etc/fstab
 
 cat <<-'EOF' | sudo tee /etc/modules-load.d/kubernetes.conf
 overlay
@@ -106,10 +106,13 @@ sudo sed -i 's/SystemdCgroup \= false/SystemdCgroup \= true/g' /etc/containerd/c
 sudo systemctl restart containerd
 sudo systemctl enable containerd
 
-sudo apt-get update
-sudo apt-get install -y apt-transport-https ca-certificates curl
 echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.29/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
 curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.29/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
 sudo apt-get update
 sudo apt-get install -y kubelet kubeadm kubectl
 sudo apt-mark hold kubelet kubeadm kubectl
+
+
+
+
+# sudo kubeadm join 172.21.109.9:6443 --token js4y3w.40r81ozfwlztg5zv --discovery-token-ca-cert-hash sha256:be9b6cdfb3350025f57fdc5dda0af3307c6bca53f4e22c598d0b1281e5aa28c4
