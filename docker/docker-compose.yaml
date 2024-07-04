@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:latest
+    container_name: mysql_container
+    environment:
+      MYSQL_ROOT_PASSWORD: 1234
+      MYSQL_DATABASE: Admin
+      MYSQL_USER: Server
+      MYSQL_PASSWORD: 1234
+      MYSQL_ROOT_HOST: "%"
+      MYSQL_PERFORMANCE_SCHEMA: 1
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  mariadb:
+    image: mariadb:latest
+    container_name: mariadb_container
+    environment:
+      MYSQL_ROOT_PASSWORD: 1234
+      MYSQL_DATABASE: Admin
+      MYSQL_USER: Server
+      MYSQL_PASSWORD: 1234
+    ports:
+      - "3307:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  redis:
+    image: redis:latest
+    container_name: redis_container
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  postgres:
+    image: postgres:latest
+    container_name: postgres_container
+    environment:
+      POSTGRES_USER: Server
+      POSTGRES_PASSWORD: 1234
+      POSTGRES_DB: Admin
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-postgres.sql:/docker-entrypoint-initdb.d/init.sql
+
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb_container
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: Server
+      MONGO_INITDB_ROOT_PASSWORD: 1234
+      MONGO_INITDB_DATABASE: Admin
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - ./init.js:/docker-entrypoint-initdb.d/init.js
+
+networks:
+  my_network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  mariadb_data:
+  redis_data:
+  postgres_data:
+  mongodb_data:
